@@ -1,14 +1,14 @@
 import React from "react";
 import {format} from "date-fns";
 
-import Agenda from "Components/calendar/agenda";
+import Agenda from "./agenda";
 import "./styles.scss"
 
 
 const Calendar = (
     {
         days, selectedMonth, onLeftClick, onRightClick, onTimeBlur, events, onEventClick, onDayClick, selectedEvent,
-        onKeyPress, onDeleteClick, onChangeColor, onTimeClick
+        onKeyPress, onDeleteClick, onChangeColor, onTimeClick, onTextBlur
     }) => {
 
     return (
@@ -63,6 +63,7 @@ const Calendar = (
                onDeleteClick={onDeleteClick}
                onTimeClick={onTimeClick}
                onKeyPress={onKeyPress}
+               onTextBlur={onTextBlur}
            />
         </div>
     )

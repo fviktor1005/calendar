@@ -35,11 +35,26 @@ class CalendarController extends Component {
                 onKeyPress={this.onKeyPress}
                 onTimeClick={this.onTimeClick}
                 onTimeBlur={this.onTimeBlur}
+                onTextBlur={this.onTextBlur}
             />
         );
     }
 
-    onTimeBlur = () => this.setState({selectedEvent: null});
+    onTimeBlur = (e) => {
+        const {id, value} = e.target;
+        const newDate = parse(value);
+        if (!(newDate instanceof Date && !isNaN(newDate))) {
+            e.target.value = e.target.defaultValue;
+            return alert('Invalid date')
+        }
+        this.props.updateEvent(id, {date: newDate});
+        this.setState({selectedEvent: null})
+    };
+
+    onTextBlur = e => {
+        const {id, value} = e.target;
+        this.props.updateEvent(id, {text: value});
+    };
 
     onTimeClick = id => () => {
         this.setState({selectedEvent: id});
