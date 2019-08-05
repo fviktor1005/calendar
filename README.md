@@ -1,4 +1,4 @@
-calendar demo project (React, Redux, Scss)
+calendar demo project (React, Redux, hooks, Scss)
 
 demo: https://calendar-partner.web.app
 

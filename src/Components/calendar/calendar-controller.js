@@ -1,72 +1,88 @@
-import React, {Component} from 'react';
-import {connect} from 'react-redux';
-import {format, addDays, addMonths, parse} from 'date-fns';
-import { createStructuredSelector } from 'reselect';
+import React, { useState, useEffect, useCallback } from 'react';
+import {useSelector, useDispatch} from 'react-redux';
+import { addMonths, parse} from 'date-fns';
 import Calendar from "./calendar";
-import { colors } from "./calendar-constants";
+import {colors} from "./calendar-constants";
 import {ACTIONS} from "./calendar-actions";
 import {getEventsByDate} from "./calendar-selectors";
+import Agenda from "./agenda";
+import {createDays} from "./calendar-functions";
 
-class CalendarController extends Component {
-    state = {
-        selectedDate: null,
-        selectedMonth: new Date(),
-        selectedEvent: null,
-        days: [],
+const CalendarWithHooks = () => {
+
+    const [days, setDays] = useState([]);
+    const [selectedMonth, setSelectedMonth] = useState(new Date());
+    const [selectedEvent, setSelectedEvent] = useState(null);
+
+    const events = useSelector(getEventsByDate);
+
+    const dispatch = useDispatch();
+
+    const getEvents = () => dispatch(ACTIONS.getEvents());
+    const postEvent = (...args) => dispatch(ACTIONS.postEvent(...args));
+    const updateEvent = (...args) => dispatch(ACTIONS.updateEvent(...args));
+    const deleteEvent = (...args) => dispatch(ACTIONS.deleteEvent(...args));
+
+    useEffect(() => {
+        getEvents();
+        const days = createDays(selectedMonth);
+        setDays(days);
+    }, [selectedMonth]);
+
+
+    const onLeftClick = () => {
+        setSelectedMonth(addMonths(selectedMonth, -1));
     };
 
-    componentDidMount() {
-        this.getDays();
-        this.props.getEvents();
-    }
+    const onRightClick = () => {
+        setSelectedMonth(addMonths(selectedMonth, 1));
+    };
 
-    render() {
-        return (
-            <Calendar
-                {...this.props}
-                {...this.state}
-                events={this.props.events}
-                onLeftClick={this.onLeftClick}
-                onRightClick={this.onRightClick}
-                onDayClick={this.onDayClick}
-                onEventClick={this.onEventClick}
-                onDeleteClick={this.onDeleteClick}
-                onChangeColor={this.onChangeColor}
-                onKeyPress={this.onKeyPress}
-                onTimeClick={this.onTimeClick}
-                onTimeBlur={this.onTimeBlur}
-                onTextBlur={this.onTextBlur}
-            />
-        );
-    }
+    const onTimeBlur = (e) => {
+        const {id, value, defaultValue} = e.target;
+        if (value === defaultValue) {
+            setSelectedEvent(null);
+            return e.target.blur();
+        }
 
-    onTimeBlur = (e) => {
-        const {id, value} = e.target;
         const newDate = parse(value);
         if (!(newDate instanceof Date && !isNaN(newDate))) {
             e.target.value = e.target.defaultValue;
             return alert('Invalid date')
         }
-        this.props.updateEvent(id, {date: newDate});
-        this.setState({selectedEvent: null})
+        updateEvent(id, {date: newDate});
+        setSelectedEvent(null);
     };
 
-    onTextBlur = e => {
-        const {id, value} = e.target;
-        this.props.updateEvent(id, {text: value});
+    const onTextBlur = e => {
+        const {id, value, defaultValue } = e.target;
+        if (value && value === defaultValue) {
+            return e.target.blur();
+        }
+        if (!value) {
+            return deleteEvent(id);
+        }
+        updateEvent(id, {text: value});
     };
 
-    onTimeClick = id => () => {
-        this.setState({selectedEvent: id});
+    const onTimeClick = id => () => {
+        setSelectedEvent(id);
     };
 
-    onKeyPress = e => {
+    const onKeyPress = e => {
         if (e.key !== 'Enter') return;
 
-        const {id, value} = e.target;
+        const {id, value,  defaultValue} = e.target;
+
+        if (value && value === defaultValue) {
+            return e.target.blur();
+        }
 
         if (e.target.name === "value") {
-            this.props.updateEvent(id, {text: value});
+            if (!value) {
+                return deleteEvent(id);
+            }
+            updateEvent(id, {text: value});
         }
 
         if (e.target.name === 'time') {
@@ -74,78 +90,69 @@ class CalendarController extends Component {
             if (!(newDate instanceof Date && !isNaN(newDate))) {
                 return alert('Invalid date')
             }
-            this.props.updateEvent(id, {date: newDate});
+            updateEvent(id, {date: newDate});
         }
         e.target.blur();
     };
 
-    onChangeColor = (date, color = '', id) => () => {
+    const onChangeColor = (date, color = '', id) => () => {
         const index = colors.findIndex(item => item === color);
         const nextIndex = index > colors.length - 1 ? 0 : index + 1;
         const nextColor = colors[nextIndex];
 
-        this.props.updateEvent(id, {color: nextColor});
+        updateEvent(id, {color: nextColor});
     };
 
-    onDeleteClick = (date, id) => () => {
-        this.props.deleteEvent(id);
+    const onDeleteClick = (date, id) => () => {
+        deleteEvent(id);
     };
 
-    onEventClick = id => (e) => {
+    const onEventClick = id => (e) => {
         e.stopPropagation();
-        this.setState({selectedEvent: id});
-
+        setSelectedEvent(id);
     };
 
-    onDayClick = day => (e) => {
+    const onDayClick = useCallback(day => (e) => {
         e.stopPropagation();
 
-        this.props.postEvent({date: day.data});
-    };
+        if(!day.currentMonth && day.day > 20) {
+            return onLeftClick();
+        }
+        if(!day.currentMonth) {
+            return onRightClick();
+        }
 
-    onLeftClick = () => {
-        this.setState(state => ({selectedMonth: addMonths(state.selectedMonth, -1)}), () => this.getDays());
+        postEvent({date: day.data});
+    }, [selectedMonth]);
 
-    };
 
-    onRightClick = () => {
-        this.setState(state => ({selectedMonth: addMonths(state.selectedMonth, 1)}), () => this.getDays());
-    };
+    return (
+        <div className="container">
+            <Calendar
+                selectedMonth={selectedMonth}
+                days={days}
+                onDayClick={onDayClick}
+                onEventClick={useCallback(onEventClick, [])}
+                onLeftClick={useCallback(onLeftClick, [selectedMonth])}
+                onRightClick={useCallback(onRightClick, [selectedMonth])}
+                events={events}
+            />
 
-    getDays = () => {
-        const {selectedMonth} = this.state;
-        const first = new Date(selectedMonth.getFullYear(), selectedMonth.getMonth(), 1);
-        let shiftDayOfWeek = format(first, "E") - 1;
-        let day = shiftDayOfWeek > 0 ? addDays(first, shiftDayOfWeek * -1) : first;
-        const days = Array.from(Array(35)).reduce((acc) => {
+            <Agenda
+                days={days}
+                events={events}
+                selectedEvent={selectedEvent}
+                onDeleteClick={onDeleteClick}
+                onChangeColor={onChangeColor}
+                onKeyPress={onKeyPress}
+                onTimeClick={onTimeClick}
+                onTimeBlur={onTimeBlur}
+                onTextBlur={onTextBlur}
+            />
 
-            acc.push({
-                data: day,
-                date: day.toDateString(),
-                day: day.getDate(),
-                currentMonth: day.getMonth() === selectedMonth.getMonth(),
-                dayOfWeek: format(day, 'dddd'),
-                month: format(day, 'MMMM'),
-                year: format(day, 'YYYY')
-            });
-            day = addDays(day, 1);
-            return acc;
-        }, []);
-        this.setState({days});
-    }
-}
-
-const mapStateToProps = createStructuredSelector({
-    events: getEventsByDate,
-});
-
-const mapDispatchToProps = {
-    postEvent: ACTIONS.postEvent,
-    getEvents: ACTIONS.getEvents,
-    deleteEvent: ACTIONS.deleteEvent,
-    updateEvent: ACTIONS.updateEvent,
+        </div>
+    );
 };
 
-export default connect(
-    mapStateToProps, mapDispatchToProps
-)(CalendarController);
+
+export default CalendarWithHooks;
